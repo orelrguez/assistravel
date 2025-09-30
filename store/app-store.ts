@@ -221,8 +221,8 @@ const useAppStore = create<AppState>((set, get) => ({
     try {
       const supabase = createClient()
       
-      // Get cases metrics
-      const { data: casos, error: casosError } = await supabase
+      // Get cases metrics with proper typing
+      const { data: rawCasos, error: casosError } = await supabase
         .from('Caso')
         .select(`
           estado_caso_interno,
@@ -233,7 +233,7 @@ const useAppStore = create<AppState>((set, get) => ({
       if (casosError) throw casosError
       
       // Get corresponsales metrics
-      const { data: corresponsales, error: corresponsalesError } = await supabase
+      const { data: rawCorresponsales, error: corresponsalesError } = await supabase
         .from('Corresponsal')
         .select(`
           id_corresponsal,
@@ -242,34 +242,51 @@ const useAppStore = create<AppState>((set, get) => ({
       
       if (corresponsalesError) throw corresponsalesError
       
-      // Calculate metrics - handle factura as array from Supabase join
-      const casosActivos = casos?.filter(c => c.estado_caso_interno === 'Activo').length || 0
-      const casosPendientesFacturar = casos?.filter(c => {
-        const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+      // Type-safe handling of the data
+      const casos = (rawCasos || []) as Array<{
+        estado_caso_interno: string;
+        estado_del_caso: string;
+        factura: Array<{ fee?: number; tiene_factura?: boolean; costo_usd?: number; }> | null;
+      }>
+      
+      const corresponsales = (rawCorresponsales || []) as Array<{
+        id_corresponsal: number;
+        casos: Array<{ estado_caso_interno: string; }> | null;
+      }>
+      
+      // Calculate metrics with proper array handling
+      const casosActivos = casos.filter(c => c.estado_caso_interno === 'Activo').length
+      
+      const casosPendientesFacturar = casos.filter(c => {
+        const facturaArray = c.factura
+        const factura = facturaArray && facturaArray.length > 0 ? facturaArray[0] : null
         return !factura?.tiene_factura || c.estado_del_caso === 'Para Refacturar'
-      }).length || 0
+      }).length
       
       const feeTotalPendiente = casos
-        ?.filter(c => {
-          const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+        .filter(c => {
+          const facturaArray = c.factura
+          const factura = facturaArray && facturaArray.length > 0 ? facturaArray[0] : null
           return !factura?.tiene_factura
         })
         .reduce((sum, c) => {
-          const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+          const facturaArray = c.factura
+          const factura = facturaArray && facturaArray.length > 0 ? facturaArray[0] : null
           return sum + (factura?.fee || 0)
-        }, 0) || 0
+        }, 0)
       
       const costoUsdTotalEstimado = casos
-        ?.filter(c => c.estado_caso_interno === 'Activo')
+        .filter(c => c.estado_caso_interno === 'Activo')
         .reduce((sum, c) => {
-          const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+          const facturaArray = c.factura
+          const factura = facturaArray && facturaArray.length > 0 ? facturaArray[0] : null
           return sum + (factura?.costo_usd || 0)
-        }, 0) || 0
+        }, 0)
       
-      const totalCorresponsales = corresponsales?.length || 0
-      const corresponsalesConCasosActivos = corresponsales?.filter(c => 
-        c.casos?.some((caso: any) => caso.estado_caso_interno === 'Activo')
-      ).length || 0
+      const totalCorresponsales = corresponsales.length
+      const corresponsalesConCasosActivos = corresponsales.filter(c => 
+        c.casos && c.casos.some(caso => caso.estado_caso_interno === 'Activo')
+      ).length
       
       const metrics: DashboardMetrics = {
         casosActivos,
