@@ -1,0 +1,8 @@
+{
+  "name": "assistravel-app",
+  "displayName": "ASSISTRAVEL - Gestión de Casos",
+  "public": true,
+  "github": {
+    "enabled": false
+  }
+}
