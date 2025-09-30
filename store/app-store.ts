@@ -294,7 +294,7 @@ const useAppStore = create<AppState>((set, get) => ({
         costoUsdTotalEstimado: facturas
           .reduce((sum, f) => sum + (f.costo_usd || 0), 0),
         totalCorresponsales: corresponsales.length,
-        corresponsalesConCasosActivos: [...new Set(casosActivos.map(c => c.id_corresponsal))].length
+        corresponsalesConCasosActivos: Array.from(new Set(casosActivos.map(c => c.id_corresponsal))).length
       }
       
       set({ metrics })
