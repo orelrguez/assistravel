@@ -242,24 +242,34 @@ const useAppStore = create<AppState>((set, get) => ({
       
       if (corresponsalesError) throw corresponsalesError
       
-      // Calculate metrics
-      const casosActivos = casos.filter(c => c.estado_caso_interno === 'Activo').length
-      const casosPendientesFacturar = casos.filter(c => 
-        !c.factura?.tiene_factura || c.estado_del_caso === 'Para Refacturar'
-      ).length
+      // Calculate metrics - handle factura as array from Supabase join
+      const casosActivos = casos?.filter(c => c.estado_caso_interno === 'Activo').length || 0
+      const casosPendientesFacturar = casos?.filter(c => {
+        const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+        return !factura?.tiene_factura || c.estado_del_caso === 'Para Refacturar'
+      }).length || 0
       
       const feeTotalPendiente = casos
-        .filter(c => !c.factura?.tiene_factura)
-        .reduce((sum, c) => sum + (c.factura?.fee || 0), 0)
+        ?.filter(c => {
+          const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+          return !factura?.tiene_factura
+        })
+        .reduce((sum, c) => {
+          const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+          return sum + (factura?.fee || 0)
+        }, 0) || 0
       
       const costoUsdTotalEstimado = casos
-        .filter(c => c.estado_caso_interno === 'Activo')
-        .reduce((sum, c) => sum + (c.factura?.costo_usd || 0), 0)
+        ?.filter(c => c.estado_caso_interno === 'Activo')
+        .reduce((sum, c) => {
+          const factura = Array.isArray(c.factura) ? c.factura[0] : c.factura
+          return sum + (factura?.costo_usd || 0)
+        }, 0) || 0
       
-      const totalCorresponsales = corresponsales.length
-      const corresponsalesConCasosActivos = corresponsales.filter(c => 
-        c.casos.some((caso: any) => caso.estado_caso_interno === 'Activo')
-      ).length
+      const totalCorresponsales = corresponsales?.length || 0
+      const corresponsalesConCasosActivos = corresponsales?.filter(c => 
+        c.casos?.some((caso: any) => caso.estado_caso_interno === 'Activo')
+      ).length || 0
       
       const metrics: DashboardMetrics = {
         casosActivos,
